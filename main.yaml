@@ -1,0 +1,67 @@
+- hosts: all
+  vars_files:
+    - vars.yaml
+  tasks:
+  # tasks file for install_postgres
+  - name: Update source list
+    apt:
+      update_cache: yes
+      # upgrade: dist  # Cập nhật tất cả các gói
+    retries: 10         
+    delay: 15     
+    when: ansible_distribution == "Ubuntu"
+    become: true
+    tags: update
+    any_errors_fatal: true 
+
+  - name: add key ssh
+    ansible.builtin.include_role:
+      name: add_key_ssh
+    tags: ssh_key
+    vars:
+      ansible_become: true
+  
+  - name: add_hosts
+    ansible.builtin.include_role:
+      name: add_hosts
+    tags: add_host
+    vars:
+      ansible_become: true
+
+  - name: install Presgres HA
+    ansible.builtin.include_role:
+      name: install_postgres
+    tags: postgres
+    vars:
+      etcd_ver: v3.5.16 # newest 30/10/2024
+      password_patroni: 123abc@A!!patroni
+      password_relp: 123abc@A!!@@
+      password_super: 123abc@A!!
+      ansible_become: true
+
+
+
+
+
+  # roles:
+  #   - role: add_key_ssh
+  #     message: "add_key_ssh process"
+  #     become: true
+  #     tags: ssh_key
+  #   - role: add_hosts
+  #     message: "add_hosts process"
+  #     become: true
+  #     tags: add_host
+  #     any_errors_fatal: true 
+  #   - role: install_postgres
+  #     message: "install_postgres process"
+  #     etcd_ver: v3.5.16 # newest 30/10/2024
+  #     password_patroni: admin1
+  #     password_relp: admin2
+  #     password_super: admin3
+  #     become: true
+  #     tags: postgres
+  #     any_errors_fatal: true 
+
+
+

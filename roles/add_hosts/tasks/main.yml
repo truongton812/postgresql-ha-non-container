@@ -1,0 +1,41 @@
+---
+
+- name: Set hostname based on IP address
+  hostname:
+    name: "{{ inventory_hostname }}"
+  become: true
+
+- name: Đảm bảo nội dung của file /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for host in groups['servers'] %}
+      {{ hostvars[host].ansible_host }} {{ host }}
+      {% endfor %}
+    create: yes
+    state: present
+  become: true
+
+- name: Đảm bảo nội dung của file /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    block: |
+      {% for host in etc_hosts %}
+      {{ host.ip }} {{ host.name }}
+      {% endfor %}
+    create: yes
+    state: present
+  when:
+    - etc_hosts is defined
+  become: true
+# - name: Đảm bảo nội dung của file /etc/hosts
+#   blockinfile:
+#     path: /etc/hosts
+#     block: |
+#       192.168.179.201 minio-01.shopsell.top
+#       192.168.179.202 minio-02.shopsell.top
+#       192.168.179.203 minio-03.shopsell.top
+#       192.168.179.204 minio-04.shopsell.top
+#     create: yes
+#     state: present 
+#   become: true

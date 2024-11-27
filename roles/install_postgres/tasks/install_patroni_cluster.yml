@@ -1,0 +1,105 @@
+---
+- name: Wait for apt process freedom
+  shell:  while sudo fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done;
+
+- name: install patroni
+  apt:
+    name: "{{ item }}"
+    state: present
+  retries: 6         
+  delay: 15 
+  with_items: 
+  - patroni
+
+- name: Create string etcd_cluster_connect
+  set_fact:
+    etcd_cluster_connect: "{{ groups['servers'] | map('extract', hostvars, 'ansible_host') | map('regex_replace', '($)', ':2379')  | join(',') }}"
+
+- name: Show string etcd_cluster_connect
+  debug:
+    msg: "{{ etcd_cluster_connect }}" 
+
+- name: Directory data and config
+  file: 
+    path: /data/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  with_items: 
+    - /data/patroni
+
+- name: Patroni file config
+  template:
+    src: patroni-temp.conf
+    dest: /etc/patroni/patroni.yml
+
+- name: Patroni folder ssl
+  file:
+    path: /etc/patroni/ssl
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0755'
+
+- name: Patroni ssl file
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/patroni/ssl/"
+    owner: postgres
+    group: postgres
+    mode: '0600'
+  with_items: 
+    - postgres_patroni/server.crt
+    - postgres_patroni/server.key
+
+
+- name: Patroni file systemd
+  template:
+    src: patroni-temp.service
+    dest: /etc/systemd/system/patroni.service
+
+- name: Reload systemd
+  ansible.builtin.command:
+    cmd: systemctl daemon-reload
+
+- name: Enable patroni startup
+  ansible.builtin.service:
+    name: patroni.service
+    enabled: true
+
+- name: Start Patroni master init
+  ansible.builtin.service:
+    name: patroni.service
+    state: started
+  when: inventory_hostname == groups['servers'][0]
+
+
+
+- name: Check port 5432
+  ansible.builtin.shell: "netstat -tuln | grep :5432"
+  retries: 30         
+  delay: 2          
+  until: port_check_result.rc == 0
+  register: port_check_result
+  failed_when: port_check_result.rc != 0
+  ignore_errors: true
+  when: inventory_hostname == groups['servers'][0]
+
+- name: Pause 15s
+  ansible.builtin.pause:
+    seconds: 15
+
+
+- name: Check node init Patronic start Postgres
+  debug:
+    msg: "Opened 5432 on server {{ inventory_hostname }}"
+  when: 
+    - inventory_hostname == groups['servers'][0]
+    - port_check_result.rc == 0
+
+- name: Start Patroni
+  ansible.builtin.service:
+    name: patroni.service
+    state: started
+  when: inventory_hostname != groups['servers'][0]

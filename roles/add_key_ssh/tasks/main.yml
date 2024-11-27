@@ -1,0 +1,33 @@
+---
+- name: Add key cho user ansible_ssh_user khai bao trong inventory
+  authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ lookup('file', public_key_path) }}"
+    # key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+
+- name: Add key cho user root
+  authorized_key:
+    user: root
+    state: present
+    key: "{{ lookup('file', public_key_path) }}"
+    # key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
+  become: yes
+
+- name: Kiểm tra cấu hình ssh đã chứa string "/home/%u/.ssh/authorized_keys" hay chưa
+  become: yes
+  register: check_ssh_config
+  shell: "egrep -i '/home/%u/.ssh/authorized_keys' /etc/ssh/sshd_config"
+  ignore_errors: true
+
+- name: Sửa file cấu hình ssh
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AuthorizedKeysFile*'
+    line: 'AuthorizedKeysFile      ~/.ssh/authorized_keys ~/.ssh/authorized_keys2 /home/%u/.ssh/authorized_keys'
+    backrefs: yes
+  become: yes
+  when: check_ssh_config.rc != 0
+  register: edit_ssh_config
+  notify:
+    - Restart SSH

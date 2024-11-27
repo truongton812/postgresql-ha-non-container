@@ -1,0 +1,141 @@
+---
+
+
+# Tạo user và group
+- name: Create group user etcd
+  ansible.builtin.group:
+    name: etcd
+    system: yes
+    state: present
+
+- name: Create user etcd với shell /sbin/nologin
+  ansible.builtin.user:
+    name: etcd
+    group: etcd
+    shell: /sbin/nologin
+    system: yes
+    state: present
+
+  
+# Cài đặt etcd
+- name: "Download the tarball into the /tmp directory"
+  get_url:
+    url: "https://storage.googleapis.com/etcd/{{ etcd_ver }}/etcd-{{ etcd_ver }}-linux-amd64.tar.gz"
+    dest: /tmp/etcd.tar.gz
+    owner: root
+    group: root
+    mode: 0600
+    force: True
+- name: "Extract the contents of the tarball"
+  unarchive:
+    src: /tmp/etcd.tar.gz
+    dest: /usr/local/bin
+    owner: root
+    group: root
+    mode: 0755
+    extra_opts:
+      - --strip-components=1
+    decrypt: True
+    remote_src: True
+
+- name: "Set the ETCDCTL_API environment variable to 3"
+  lineinfile:
+    path: /etc/profile
+    line: export ETCDCTL_API=3
+    state: present
+    create: True
+    insertafter: EOF
+
+- name: "Create directory for etcd data"
+  file:
+    path: /var/lib/etcd
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: 0755
+
+- name: "Create directory for etcd config"
+  file:
+    path: /etc/etcd
+    state: directory
+    owner: root
+    group: root
+    mode: 0755
+# Create CA-CERT
+
+- name: create folder for create ca-cert
+  ansible.builtin.file:
+    path: "/tmp/general-etcd-cert/"
+    state: directory
+
+- name: tools create cert
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/tmp/general-etcd-cert/"
+    mode: '0755'
+  with_items:
+    - etcd/cfssl
+    - etcd/cfssljson
+    - etcd/ca-config.json
+    - etcd/ca-key.pem
+    - etcd/ca.csr
+    - etcd/ca.pem
+- name: script general ca-cert
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "/tmp/general-etcd-cert/"
+    mode: '0755'
+  with_items:
+    - general-ca-cert-tmp.sh
+
+- name: Chạy script general-ca-cert-tmp.sh tại thư mục /tmp/general-etcd-cert
+  ansible.builtin.shell: ./general-ca-cert-tmp.sh
+  args:
+    chdir: /tmp/general-etcd-cert
+  become: true
+  register: script_output
+  ignore_errors: false
+
+  
+- name: Create string ETCD_INITIAL_CLUSTER
+  set_fact:
+    etcd_initial_cluster: "{{ groups['servers'] | map('extract', hostvars, 'inventory_hostname') | zip(groups['servers'] | map('extract', hostvars, 'ansible_host')) | map('join', '=https://') | map('regex_replace', '($)', '\\1:2380') | join(',')}}"
+                          # node1=http://192.168.179.201:2380,node2=http://192.168.179.202:2380,node3=http://192.168.179.203:2380
+
+- name: Show string ETCD_INITIAL_CLUSTER
+  debug:
+    msg: "{{ etcd_initial_cluster }}"  
+- name: config etcd for master init cluster
+  template:
+    src: etcd-temp.config
+    dest: /etc/etcd/etcd.conf
+  vars:
+    cluster_status: "new"
+  when: inventory_hostname == groups['servers'][0]
+
+- name: config etcd slave
+  template:
+    src: etcd-temp.config
+    dest: /etc/etcd/etcd.conf
+  vars:
+    cluster_status: "existing"
+  when: inventory_hostname != groups['servers'][0]
+
+- name: Create service etcd
+  template:
+    src: etcd-temp.service
+    dest: /etc/systemd/system/etcd.service
+
+- name: Reload systemd
+  ansible.builtin.command:
+    cmd: systemctl daemon-reload
+
+- name: enable etcd startup
+  ansible.builtin.service:
+    name: etcd
+    enabled: true
+
+- name: restart etcd
+  ansible.builtin.service:
+    name: etcd
+    state: started

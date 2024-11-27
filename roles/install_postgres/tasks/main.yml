@@ -1,0 +1,112 @@
+# ---
+# tasks file for install_postgres
+- name: Get version Ubuntu
+  ansible.builtin.command: lsb_release -cs
+  register: ubuntu_version
+
+- name: Show version Ubuntu 
+  debug:
+    msg: "version: {{ ubuntu_version.stdout }}"
+
+- name: Update source list PGDG
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/pgdg.list
+    content: |
+      deb http://apt.postgresql.org/pub/repos/apt {{ ubuntu_version.stdout }}-pgdg main
+
+- name: Add an Apt signing key to a specific keyring file
+  ansible.builtin.apt_key:
+    url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+    keyring: /etc/apt/trusted.gpg.d/postgresql.gpg
+
+- name: Update source list
+  ansible.builtin.apt:
+    update_cache: yes
+
+- name: Wait for apt process freedom
+  become: yes
+  shell:  while sudo fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done;
+  
+- name: Install PostgreSQL 17
+  ansible.builtin.apt:
+    name: postgresql-17
+    state: present
+  retries: 6         
+  delay: 15 
+
+
+- name: Stop PostgreSQL
+  ansible.builtin.service:
+    name: postgresql
+    state: stopped
+
+- name:  Disable service Postgress startup
+  ansible.builtin.service:
+    name: postgresql
+    enabled: false
+
+
+- name: List file bin/* of PostgreSQL
+  ansible.builtin.command: ls /usr/lib/postgresql/17/bin/
+  register: bin_files
+
+
+# - name: debug 
+#   debug:
+#     msg: "{{ bin_files }}"
+
+- name: Symbolic link PostgreSQL
+  ansible.builtin.file:
+    src: "/usr/lib/postgresql/17/bin/{{ item }}"
+    dest: "/usr/sbin/{{ item }}"
+    state: link
+  loop: "{{ bin_files.stdout_lines }}"
+
+
+- name: Wait for apt process freedom
+  become: yes
+  shell:  while sudo fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done;
+
+- name: Install packets necessary
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    state: present
+  retries: 10         
+  delay: 15 
+  with_items:
+    - python3-pip
+    - python3-dev
+    - binutils
+    - net-tools
+
+
+- name: Collector list services installed 
+  ansible.builtin.service_facts:
+
+# - name: Print service facts
+#   ansible.builtin.debug:
+#     var: ansible_facts.services
+
+- name: Check exist etcd service
+  debug:
+    msg: "Dịch vụ etcd đã tồn tại."
+  when: "'etcd.service' in services"
+
+- name: Install etcd cluster
+  ansible.builtin.include_tasks: install_etcd_cluster.yml
+  when: "'etcd.service' not in services"
+    
+# install patroni
+
+- name: Install patrioni cluster
+  ansible.builtin.include_tasks: install_patroni_cluster.yml
+  when: "'patroni.service' not in services"
+  
+
+# install HA Proxy
+
+- name: Install HA Proxy
+  ansible.builtin.include_tasks: install_haproxy_cluster.yml
+  when: 
+    - "'haproxy.service' not in services"
+    

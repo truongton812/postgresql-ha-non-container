@@ -1,0 +1,195 @@
+- hosts: all
+  vars_files:
+    - vars.yaml
+  become: true
+  tasks:
+  - name: Wait for apt process freedom
+    become: yes
+    shell:  while sudo fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done;
+  # - name: Đảm bảo rằng apt không bị khoá
+  #   ansible.builtin.command: |
+  #     while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock >/dev/null 2>&1; do
+  #       echo "Đang chờ khóa apt được giải phóng..."
+  #       sleep 5
+  #     done
+    # any_errors_fatal: true 
+    # ignore_errors: true
+  - name: kq
+    debug:
+      msg: "ok"
+
+
+  # - name: Thu thập thông tin về các dịch vụ
+  #   ansible.builtin.service_facts:
+
+  # - name: Install patrioni cluster
+  #   ansible.builtin.include_tasks: install_patroni_cluster.yml
+  #   when: "'patroni.service' not in services"
+
+  # - name: Kiểm tra xem dịch vụ etcd có tồn tại không
+  #   debug:
+  #     msg: "Dịch vụ etcpatrionid đã tồn tại."
+  #   when: "'patroni.service' in services"
+    # - block:
+    #     - name: Cài đặt HAProxy
+    #       ansible.builtin.package:
+    #         name: haproxy
+    #         state: present
+
+    #     - name: HAProxy startup
+    #       ansible.builtin.service:
+    #         name: haproxy
+    #         enabled: yes
+        
+    #     - name: File config
+    #       ansible.builtin.template:
+    #         src: ./haproxy-temp.cfg
+    #         dest: /etc/haproxy/haproxy.cfg
+    #         owner: root
+    #         group: root
+    #         mode: '0755'
+
+    #     - name: Kiểm tra phiên bản HAProxy
+    #       ansible.builtin.shell: haproxy -v
+    #       register: haproxy_version
+    #       ignore_errors: yes
+
+    #     - name: Hiển thị phiên bản HAProxy
+    #       debug:
+    #         msg: "Phiên bản HAProxy: {{ haproxy_version.stdout }}"
+    #   when: inventory_hostname == groups['servers'][0] or inventory_hostname == groups['servers'][1]
+    #   rescue:
+    #     - name: Xử lý khi có lỗi trong quá trình cài đặt HAProxy
+    #       debug:
+    #         msg: "Có lỗi xảy ra trong quá trình cài đặt HAProxy."
+
+    #   always:
+    #     - name: Đảm bảo dịch vụ HAProxy luôn được dừng trước khi kết thúc block
+    #       ansible.builtin.service:
+    #         name: haproxy
+    #         state: restart
+    #       when: haproxy_version is not defined
+
+
+
+
+
+
+    # Create cert
+    # - name: create folder for create ca-cert
+    #   ansible.builtin.file:
+    #     path: "/tmp/general-etcd-cert/"
+    #     state: directory
+
+    # - name: tools create cert
+    #   ansible.builtin.copy:
+    #     src: "{{ item }}"
+    #     dest: "/tmp/general-etcd-cert/{{ item }}"
+    #     mode: '0755'
+    #   with_items:
+    #     - cfssl
+    #     - cfssljson
+    #     - ca-config.json
+    #     - ca-key.pem
+    #     - ca.csr
+    #     - ca.pem
+    # - name: script general ca-cert
+    #   ansible.builtin.template:
+    #     src: "{{ item }}"
+    #     dest: "/tmp/general-etcd-cert/{{ item }}"
+    #     mode: '0755'
+    #   with_items:
+    #     - general-ca-cert-tmp.sh
+
+    # - name: Chạy script general-ca-cert-tmp.sh tại thư mục /tmp/general-etcd-cert
+    #   ansible.builtin.shell: ./general-ca-cert-tmp.sh
+    #   args:
+    #     chdir: /tmp/general-etcd-cert
+    #   become: true
+    #   register: script_output
+    #   ignore_errors: no
+
+
+
+
+
+    # - name: Directory data and config
+    #   file: 
+    #     path: /data/patroni
+    #     state: directory
+    #     owner: postgres
+    #     group: postgres
+    #     mode: '0750'
+    #   with_items: 
+    #     - /data/patroni
+
+    # - name: Tạo chuỗi initial-cluster
+    #   set_fact:
+    #     etcd_initial_cluster: "{{ groups['servers'] | map('extract', hostvars, 'ansible_host') | map('regex_replace', '($)', ':2379')  | join(',') }}"
+    # - name: In ra chuỗi initial-cluster
+    #   debug:
+    #     msg: "{{ etcd_initial_cluster }}"
+
+
+
+
+
+  # - name: test2
+  #   debug:
+  #     msg: |-
+  #       {% for host in groups['servers'] %}
+  #       - host replication replicator {{ hostvars[host].ansible_host }}/0 md5
+  #       {% endfor %}
+    # - name: Tạo chuỗi etcd_cluster_connect
+    #   set_fact:
+    #     etcd_cluster_connect: "{{ groups['servers'] | map('regex_replace', '($)', ':2379') | join(',')}}"
+
+    # - name: Hiển thị chuỗi etcd_cluster_connect
+    #   debug:
+    #     msg: "{{ etcd_cluster_connect }}"  
+
+        
+    # - name: Tạo chuỗi initial-cluster
+    #   set_fact:
+    #     #etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'ansible_host') | map('regex_replace', '^(.*)$', '\\1=http://\\1:2380') | zip(groups['servers']) | map('join', '=') | join(',') }}"
+    #     # etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'ansible_host') | zip(groups['servers']) | map('join', '=http://') | join(',') }}"
+    #     # etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'inventory_hostname') | zip(groups['servers']) | map('join', '=http://') | join(',') }}"
+    #     etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'inventory_hostname') | zip(groups['servers'] | map('extract', hostvars, 'ansible_host')) | map('join', '=http://') | map('regex_replace', '($)', '\\1:3128') | join(',')}} "    ## running
+    #     # etcd_initial_cluster: "initial-cluster: {{ groups['servers'].ansible_host }}"    
+    #     #etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('regex_replace', '^(.*)$', '\\1=http://'+hostvars[\\1].ansible_host+':2380') | join(',') }}"
+    #     #etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('regex_replace', '^(.*)$', '\\1=http://')+ansible_host | join(',') }}"
+    #     #etcd_initial_cluster: " initial-cluster: {{ groups['servers'] | map('regex_replace', '^(.*)$', '\\1=http://'+hostvars['\\1'].ansible_host)}}"
+    #     # etcd_initial_cluster: " initial-cluster: {{ groups['servers'] | join(',')}}"
+    # # - name: Tạo chuỗi initial-cluster
+    # #   set_fact:
+    # #     #etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'inventory_hostname') | map('regex_replace', '^(.*)$', '\\1=http://' | join(','))"
+    # #     # etcd_initial_cluster: "initial-cluster: {{ groups['servers'] | map('extract', hostvars, 'inventory_hostname') | map('string') | map('regex_replace', '^(.*)$', '\\1') | join(',') }}"
+    # #     etcd_initial_cluster: "{{ zip(groups['servers']) }}"
+    # - name: In ra chuỗi initial-cluster
+    #   debug:
+    #     msg: "{{ etcd_initial_cluster }}"
+
+    # - name: test
+    #   debug:
+    #     msg: "{{ hostvars }}"
+    # - name: test
+    #   debug:
+    #     msg: "{{ ansible_host }}"
+
+  #   - name: test2
+  #     debug:
+  #       msg: |
+  #         {% for host in groups['mongos-server'] %}
+  #         {{ hostvars[host].ansible_host }} {{ host }}
+  #         {% endfor %}
+
+  #   - name: Đảm bảo nội dung của file /tmp/file1
+  #     blockinfile:
+  #       path: /tmp/file1
+  #       block: |
+  #         {% for host in groups['mongos-server'] %}
+  #         - {{ host }}:27017
+  #         {% endfor %}
+  #       create: yes
+  #       state: present
+  # become: true

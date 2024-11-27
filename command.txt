@@ -1,0 +1,41 @@
+# Check status etcd
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem member list
+
+
+echo "123abc@A" | etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem  user add user_etcd --interactive=false
+
+echo "123abc@A" | etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem  user add node1 --interactive=false
+
+
+echo "123abc@A" | etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem  user add root --interactive=false
+
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem auth enable
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=root:123abc@A get /
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=user_etcd:123abc@A get /
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=root:123abc@A user grant-role user_etcd root
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=root:123abc@A user grant-role node1 root
+
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=user_etcd:123abc@A get /
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=user_etcd:123abc@A auth disable
+
+ansible all -m shell -a "systemctl start patroni" --become
+ansible all -m shell -a "systemctl stop patroni" --become
+
+
+etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/ca.pem --cert=/etc/etcd/node1.pem --key=/etc/etcd/node1-key.pem --user=user_etcd:123abc@A get /
+
+
+patronictl -c /etc/patroni/patroni.yml list postgres
+
+
+haproxy -c -f /etc/haproxy/haproxy.cfg
+
+
+openssl req -new -x509 -days 7200 -key server.key -out server.crt -subj "/C=VN/ST=HN/L=HA/O=CG/OU=IT/CN=*.postgres.vn"
+

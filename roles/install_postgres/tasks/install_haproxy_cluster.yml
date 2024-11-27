@@ -1,0 +1,45 @@
+---
+- block:
+
+    - name: Wait for apt process freedom
+      shell:  while sudo fuser /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done;
+
+    - name: Install HAProxy
+      ansible.builtin.package:
+        name: haproxy
+        state: present
+      retries: 6         
+      delay: 15 
+
+    - name: HAProxy startup
+      ansible.builtin.service:
+        name: haproxy
+        enabled: yes
+    
+    - name: File config
+      ansible.builtin.template:
+        src: haproxy-temp.cfg
+        dest: /etc/haproxy/haproxy.cfg
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Check Verion HAProxy
+      ansible.builtin.shell: haproxy -v
+      register: haproxy_version
+      ignore_errors: true
+
+    - name: Show version HAProxy
+      debug:
+        msg: "Phiên bản HAProxy: {{ haproxy_version.stdout }}"
+
+    - name: Start Haproxy
+      ansible.builtin.service:
+        name: haproxy
+        state: reloaded
+  when: inventory_hostname == groups['servers'][0] or inventory_hostname == groups['servers'][1]
+  rescue:
+    - name: Xử lý khi có lỗi trong quá trình cài đặt HAProxy
+      debug:
+        msg: "Có lỗi xảy ra trong quá trình cài đặt HAProxy."
+
